@@ -12,9 +12,9 @@ import {
 } from 'three';
 
 const STYLE = {
-  jointCoM:     { color: 0xfbbf24, size: 0.18 },  // amber
-  linkCoM:      { color: 0x38bdf8, size: 0.15 },  // sky blue
-  payloadCoM:   { color: 0xa3e635, size: 0.22 },  // lime
+  jointCoM:     { color: 0xfbbf24, size: 0.28 },  // amber
+  linkCoM:      { color: 0x38bdf8, size: 0.22 },  // sky blue
+  payloadCoM:   { color: 0xa3e635, size: 0.30 },  // lime
   assemblySphere: 0xfafafa,                        // white
   assemblyRing:   0xa78bfa,                        // violet
 };
@@ -31,7 +31,12 @@ function makeCrosshair(color, size) {
   ]);
   const geom = new BufferGeometry();
   geom.setAttribute('position', new Float32BufferAttribute(verts, 3));
-  return new LineSegments(geom, new LineBasicMaterial({ color }));
+  const lines = new LineSegments(
+    geom,
+    new LineBasicMaterial({ color, depthTest: false, depthWrite: false }),
+  );
+  lines.renderOrder = 1;
+  return lines;
 }
 
 function makeAssemblyGroup() {
