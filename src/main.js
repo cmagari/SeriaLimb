@@ -4,6 +4,8 @@ import { buildRobotTree, applyAngles, disposeRobotTree } from './scene/robotMesh
 import { buildCoMMarkers, updateCoMMarkers, applyCoMVisibility, disposeCoMMarkers } from './scene/comMarkers.js';
 import { createViewState } from './scene/viewState.js';
 import { createMotionPlanner } from './motion/motionPlanner.js';
+import { createKeyframeStore } from './motion/keyframes.js';
+import { createDragControls } from './scene/dragControls.js';
 import { mountTabs } from './ui/tabs.js';
 import { mountSetupPanel } from './ui/setupPanel.js';
 import { mountControlsPanel } from './ui/controlsPanel.js';
@@ -22,6 +24,7 @@ const sceneMgr  = createSceneManager(viewport);
 const planner   = createMotionPlanner(state);
 const viewState = createViewState();
 const recorder  = createTelemetryRecorder(state, planner);
+const keyframes = createKeyframeStore(state, planner, recorder);
 
 let robotRoot = buildRobotTree(state);
 sceneMgr.scene.add(robotRoot);
@@ -52,9 +55,17 @@ viewState.subscribe(() => {
   applyCoMVisibility(comRoot, viewState);
 });
 
+createDragControls({
+  renderer: sceneMgr.renderer,
+  camera: sceneMgr.camera,
+  controls: sceneMgr.controls,
+  state,
+  getRobotRoot: () => robotRoot,
+});
+
 mountTabs(tabBar);
 mountSetupPanel(setupPanelEl, state);
-mountControlsPanel(ctrlPanelEl, state, planner);
+mountControlsPanel(ctrlPanelEl, state, planner, keyframes);
 mountViewPanel(viewPanelEl, viewState);
 
 const telemetryPanelEl = document.getElementById('panel-telemetry');

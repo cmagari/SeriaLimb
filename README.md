@@ -36,9 +36,11 @@ The window is split 70 / 30: the **3D viewport** on the left and the **sidebar**
 
 ### Viewport
 
-- **Left-click + drag** — orbit the camera.
+- **Left-click + drag** (empty space) — orbit the camera.
 - **Right-click + drag** — pan.
 - **Scroll wheel** — zoom.
+- **Left-click + drag on the green tip** — inverse kinematics. The chain follows the cursor (CCD solver) on a plane perpendicular to the camera. Sliders update live, motion can be recorded as a keyframe.
+- **Left-click + drag on an amber joint cylinder** — forward kinematics. That joint rotates about its own axis; downstream links carry along.
 - The grid is on the XZ plane (Y up); the axes helper at the base shows X (red), Y (green), Z (blue).
 - Color key: **slate** disc = base, **amber** cylinders = joints (cylinder axis = rotation axis), **blue** cylinders = links, **green** sphere = end-effector / payload.
 - Joint and link cylinder radii scale with `√mass` so heavier elements are visually larger.
@@ -60,7 +62,7 @@ Joint angles are preserved across rebuilds when the link index still exists.
 
 ### Controls tab
 
-Two modes toggled at the top. **Reset to 0** is available in either mode and cancels any running motion.
+Three modes toggled at the top: **Manual**, **Planner**, **Sequence**. **Reset to 0** is available in any mode and cancels any running motion or sequence playback.
 
 #### Manual mode
 
@@ -83,6 +85,26 @@ Animates the robot from its current pose to a set of target joint angles.
 Inputs are disabled while a motion is running. Switching to Manual mode also cancels any active motion.
 
 Each completed (or cancelled) planner session is automatically recorded and available in the **Telemetry tab**.
+
+#### Sequence mode
+
+Captures an ordered list of poses (keyframes) and plays the planner through them sequentially. Pose the robot using any combination of dragging, manual sliders, or planner runs, then snapshot.
+
+| Control | Purpose |
+| --- | --- |
+| `Per-segment duration (s)` | Time the planner takes to move between consecutive keyframes. |
+| `Easing` | `Smooth` or `Linear` — applied to each segment. |
+| `+ Add keyframe from current pose` | Appends a keyframe holding the current joint angles. |
+| Per keyframe: `Save current` | Overwrites that keyframe with the current pose. |
+| Per keyframe: `Go to` | Snaps the robot to that keyframe (no animation). |
+| Per keyframe: `Delete` | Removes that keyframe. |
+| `Play sequence` | Snaps to keyframe 1, then animates 1→2→3→… in order. |
+| `Cancel` | Freezes mid-sequence. |
+| `Clear all` | Removes every keyframe. Keyframes otherwise persist across structure edits, mode switches, and replays. |
+
+Replays always start from the first keyframe. Keyframes captured against an old structure (different `N` or axis) are padded/truncated to fit the current robot — `Clear all` if you'd rather start fresh.
+
+The whole sequence is recorded as a **single continuous telemetry session** (one per playback) — segment boundaries become inflection points on the velocity / torque / power plots rather than separate sessions.
 
 ### View tab
 
@@ -203,24 +225,27 @@ SeriaLimb/
 ├── index.html
 ├── package.json
 └── src/
-    ├── main.js                    # entry: wires state, scene, UI
+    ├── main.js                    # entry: wires state, scene, UI, drag controls, keyframe store
     ├── style.css                  # Tailwind v4 + component styles
     ├── model/
     │   └── robotState.js          # state store (pub/sub: 'structure', 'angles')
     ├── kinematics/
-    │   └── forwardKinematics.js   # segmentTransform + accumulate → joint world positions
+    │   ├── forwardKinematics.js   # segmentTransform + accumulate → joint world positions
+    │   └── inverseKinematics.js   # CCD solver for arbitrary per-joint axes
     ├── motion/
     │   ├── motionPlanner.js       # target angles, easing, rAF animation loop
-    │   └── telemetryRecorder.js   # per-frame angle/velocity/torque/power recorder
+    │   ├── telemetryRecorder.js   # per-frame angle/velocity/torque/power recorder; group mode for multi-segment runs
+    │   └── keyframes.js           # keyframe store + sequence player
     ├── scene/
     │   ├── sceneManager.js        # renderer, camera, lights, orbit controls
-    │   ├── robotMesh.js           # hierarchical robot Three.js tree
+    │   ├── robotMesh.js           # hierarchical robot Three.js tree; tags drag handles
     │   ├── comMarkers.js          # CoM crosshairs and assembly sphere
-    │   └── viewState.js           # CoM visibility flags
+    │   ├── viewState.js           # CoM visibility flags
+    │   └── dragControls.js        # pointer/raycaster handlers — IK on tip, FK on joints
     └── ui/
         ├── tabs.js
         ├── setupPanel.js
-        ├── controlsPanel.js       # manual + planner modes
+        ├── controlsPanel.js       # manual + planner + sequence modes
         ├── viewPanel.js           # CoM toggles
         └── telemetryPanel.js      # Chart.js plots + CSV/PNG export
 ```
@@ -237,5 +262,6 @@ SeriaLimb/
 ## Roadmap
 
 - JSON / URDF export of the current robot configuration.
-- Inverse kinematics — drag the end-effector to solve joint angles.
+- Save / load keyframe sequences across sessions.
+- Joint angle limits per link (hard stops in IK and slider clamps).
 - Full rigid-body dynamics (inertia tensors, Coriolis, damping) to extend the quasi-static torque model.

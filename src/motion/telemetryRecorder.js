@@ -8,6 +8,7 @@ export function createTelemetryRecorder(state, planner) {
   let current = null;
   let prevAngles = [];
   let prevTime = 0;
+  let groupActive = false;
   const listeners = new Set();
 
   function emit() {
@@ -20,6 +21,26 @@ export function createTelemetryRecorder(state, planner) {
     const torques = computeGravityTorques(state.links, jointWorldPositions, state.payloadMass);
     const powers = torques.map((tau, i) => tau * velocities[i] * DEG2RAD);
     return { velocities, torques, powers };
+  }
+
+  function finalize() {
+    if (!current) return;
+    const now = performance.now();
+    const elapsed = (now - current.startTime) / 1000;
+    const angles = state.links.map((l) => l.angleDeg);
+    const { jointWorldPositions } = accumulate(state.links);
+    const torques = computeGravityTorques(state.links, jointWorldPositions, state.payloadMass);
+    current.samples.push({
+      elapsed,
+      angles: [...angles],
+      velocities: new Array(state.numLinks).fill(0),
+      torques,
+      powers: new Array(state.numLinks).fill(0),
+    });
+    sessions.push(current);
+    if (sessions.length > MAX_SESSIONS) sessions.shift();
+    current = null;
+    emit();
   }
 
   planner.subscribe((api) => {
@@ -49,6 +70,13 @@ export function createTelemetryRecorder(state, planner) {
       return;
     }
 
+    // ── New segment within an active group (keep the same session) ───────────
+    if (groupActive && current && api.running && api.progress === 0) {
+      prevAngles = state.links.map((l) => l.angleDeg);
+      prevTime = performance.now();
+      return;
+    }
+
     // ── Ongoing ticks ────────────────────────────────────────────────────────
     if (current && api.running) {
       const now = performance.now();
@@ -59,32 +87,39 @@ export function createTelemetryRecorder(state, planner) {
       current.samples.push({ elapsed, angles: [...angles], velocities, torques, powers });
       prevAngles = angles;
       prevTime = now;
+      return;
     }
 
     // ── Motion ended ─────────────────────────────────────────────────────────
     if (current && !api.running) {
-      const now = performance.now();
-      const elapsed = (now - current.startTime) / 1000;
-      const angles = state.links.map((l) => l.angleDeg);
-      const { jointWorldPositions } = accumulate(state.links);
-      const torques = computeGravityTorques(state.links, jointWorldPositions, state.payloadMass);
-      current.samples.push({
-        elapsed,
-        angles: [...angles],
-        velocities: new Array(state.numLinks).fill(0),
-        torques,
-        powers: new Array(state.numLinks).fill(0),
-      });
-      sessions.push(current);
-      if (sessions.length > MAX_SESSIONS) sessions.shift();
-      current = null;
-      emit();
+      if (groupActive) {
+        // Segment boundary inside a group: keep accumulating, but record the
+        // segment's final pose with real velocities (not zero) since motion
+        // continues into the next segment.
+        const now = performance.now();
+        const elapsed = (now - current.startTime) / 1000;
+        const angles = state.links.map((l) => l.angleDeg);
+        const dt = (now - prevTime) / 1000;
+        const { velocities, torques, powers } = snapshot(angles, dt);
+        current.samples.push({ elapsed, angles: [...angles], velocities, torques, powers });
+        prevAngles = angles;
+        prevTime = now;
+        return;
+      }
+      finalize();
     }
   });
 
   return {
     get sessions() { return sessions; },
     get recording() { return current !== null; },
+    beginGroup() {
+      groupActive = true;
+    },
+    endGroup() {
+      groupActive = false;
+      finalize();
+    },
     subscribe(cb) {
       listeners.add(cb);
       return () => listeners.delete(cb);

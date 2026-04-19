@@ -79,7 +79,9 @@ export function buildRobotTree(state) {
     parent.add(jointGroup);
     jointGroups.push(jointGroup);
 
-    jointGroup.add(makeJointCylinder(link.axis, link.jointMass));
+    const jointMesh = makeJointCylinder(link.axis, link.jointMass);
+    jointMesh.userData.dragHandle = { type: 'joint', index: i };
+    jointGroup.add(jointMesh);
 
     const r = linkRadius(link.linkMass);
     const linkMesh = new Mesh(
@@ -100,6 +102,7 @@ export function buildRobotTree(state) {
       makeMaterial(COLORS.endEffector),
     );
     endMarker.position.x = lastLen;
+    endMarker.userData.dragHandle = { type: 'tip' };
     parent.add(endMarker);
   }
 

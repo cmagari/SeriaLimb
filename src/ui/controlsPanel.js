@@ -1,14 +1,16 @@
 import { EASING_OPTIONS } from '../motion/motionPlanner.js';
 
-export function mountControlsPanel(container, state, planner) {
+export function mountControlsPanel(container, state, planner, keyframes) {
   let mode = 'manual';
   let manualRefs = emptyManualRefs();
   let plannerRefs = null;
+  let sequenceRefs = null;
 
   function render() {
     container.innerHTML = '';
     manualRefs = emptyManualRefs();
     plannerRefs = null;
+    sequenceRefs = null;
 
     renderHeader();
     if (state.numLinks === 0) {
@@ -19,7 +21,8 @@ export function mountControlsPanel(container, state, planner) {
       return;
     }
     if (mode === 'manual') renderManual();
-    else renderPlanner();
+    else if (mode === 'planner') renderPlanner();
+    else renderSequence();
   }
 
   function renderHeader() {
@@ -28,13 +31,14 @@ export function mountControlsPanel(container, state, planner) {
 
     const modeGroup = document.createElement('div');
     modeGroup.className = 'mode-toggle';
-    for (const [id, label] of [['manual', 'Manual'], ['planner', 'Planner']]) {
+    for (const [id, label] of [['manual', 'Manual'], ['planner', 'Planner'], ['sequence', 'Sequence']]) {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = `mode-btn${mode === id ? ' mode-btn-active' : ''}`;
       btn.textContent = label;
       btn.addEventListener('click', () => {
         if (mode === id) return;
+        if (keyframes?.playing) keyframes.cancel();
         if (planner.running) planner.cancel();
         mode = id;
         render();
@@ -48,6 +52,7 @@ export function mountControlsPanel(container, state, planner) {
     resetBtn.type = 'button';
     resetBtn.textContent = 'Reset to 0';
     resetBtn.addEventListener('click', () => {
+      if (keyframes?.playing) keyframes.cancel();
       if (planner.running) planner.cancel();
       state.resetAngles();
     });
@@ -258,6 +263,202 @@ export function mountControlsPanel(container, state, planner) {
     syncPlannerUi();
   }
 
+  function renderSequence() {
+    if (!keyframes) {
+      const msg = document.createElement('p');
+      msg.className = 'text-sm text-slate-500';
+      msg.textContent = 'Keyframe store unavailable.';
+      container.appendChild(msg);
+      return;
+    }
+
+    const hint = document.createElement('p');
+    hint.className = 'text-xs text-slate-400 mb-3';
+    hint.textContent = 'Pose the robot (drag in 3D or use Manual sliders), then capture keyframes. Play steps through them in order.';
+    container.appendChild(hint);
+
+    const configRow = document.createElement('div');
+    configRow.className = 'mb-3 grid grid-cols-2 gap-2';
+
+    const durationWrap = document.createElement('label');
+    durationWrap.className = 'flex flex-col gap-1 text-xs text-slate-400';
+    durationWrap.innerHTML = '<span>Per-segment duration (s)</span>';
+    const durationInput = document.createElement('input');
+    durationInput.type = 'number';
+    durationInput.min = '0';
+    durationInput.max = '120';
+    durationInput.step = '0.1';
+    durationInput.value = planner.durationSeconds.toFixed(1);
+    durationInput.addEventListener('input', () => {
+      planner.setDuration(Number.parseFloat(durationInput.value));
+    });
+    durationWrap.appendChild(durationInput);
+    configRow.appendChild(durationWrap);
+
+    const easingWrap = document.createElement('label');
+    easingWrap.className = 'flex flex-col gap-1 text-xs text-slate-400';
+    easingWrap.innerHTML = '<span>Easing</span>';
+    const easingSelect = document.createElement('select');
+    for (const { value, label } of EASING_OPTIONS) {
+      const opt = document.createElement('option');
+      opt.value = value;
+      opt.textContent = label;
+      if (planner.easing === value) opt.selected = true;
+      easingSelect.appendChild(opt);
+    }
+    easingSelect.addEventListener('change', () => {
+      planner.setEasing(easingSelect.value);
+    });
+    easingWrap.appendChild(easingSelect);
+    configRow.appendChild(easingWrap);
+    container.appendChild(configRow);
+
+    const listWrap = document.createElement('div');
+    listWrap.className = 'space-y-2 mb-3';
+    container.appendChild(listWrap);
+
+    const addBtn = document.createElement('button');
+    addBtn.type = 'button';
+    addBtn.className = 'secondary w-full mb-3';
+    addBtn.textContent = '+ Add keyframe from current pose';
+    addBtn.addEventListener('click', () => keyframes.add());
+    container.appendChild(addBtn);
+
+    const actionsRow = document.createElement('div');
+    actionsRow.className = 'flex flex-wrap items-center gap-2';
+    const playBtn = document.createElement('button');
+    playBtn.type = 'button';
+    playBtn.className = 'primary';
+    playBtn.textContent = 'Play sequence';
+    playBtn.addEventListener('click', () => {
+      keyframes.play(planner.durationSeconds, planner.easing);
+    });
+    const cancelBtn = document.createElement('button');
+    cancelBtn.type = 'button';
+    cancelBtn.className = 'secondary';
+    cancelBtn.textContent = 'Cancel';
+    cancelBtn.addEventListener('click', () => keyframes.cancel());
+    const clearBtn = document.createElement('button');
+    clearBtn.type = 'button';
+    clearBtn.className = 'secondary';
+    clearBtn.textContent = 'Clear all';
+    clearBtn.title = 'Remove every keyframe';
+    clearBtn.addEventListener('click', () => keyframes.clear());
+    actionsRow.appendChild(playBtn);
+    actionsRow.appendChild(cancelBtn);
+    actionsRow.appendChild(clearBtn);
+    container.appendChild(actionsRow);
+
+    const statusText = document.createElement('p');
+    statusText.className = 'text-xs text-slate-500 mt-2 tabular-nums';
+    container.appendChild(statusText);
+
+    sequenceRefs = {
+      durationInput,
+      easingSelect,
+      listWrap,
+      addBtn,
+      playBtn,
+      cancelBtn,
+      clearBtn,
+      statusText,
+    };
+    syncSequenceUi();
+  }
+
+  function rebuildKeyframeList() {
+    if (!sequenceRefs) return;
+    const wrap = sequenceRefs.listWrap;
+    wrap.innerHTML = '';
+    const playing = keyframes.playing;
+    const frames = keyframes.frames;
+
+    if (frames.length === 0) {
+      const empty = document.createElement('p');
+      empty.className = 'text-xs text-slate-500 italic';
+      empty.textContent = 'No keyframes yet.';
+      wrap.appendChild(empty);
+      return;
+    }
+
+    frames.forEach((frame, idx) => {
+      const card = document.createElement('div');
+      card.className = 'rounded border border-slate-700 bg-slate-800/40 p-2 text-xs';
+
+      const head = document.createElement('div');
+      head.className = 'flex items-center justify-between mb-1';
+      const title = document.createElement('span');
+      title.className = 'text-slate-200 font-medium';
+      title.textContent = `Keyframe ${idx + 1}`;
+      head.appendChild(title);
+
+      const btnGroup = document.createElement('div');
+      btnGroup.className = 'flex gap-1';
+      const saveBtn = document.createElement('button');
+      saveBtn.type = 'button';
+      saveBtn.className = 'secondary px-2 py-0.5 text-xs';
+      saveBtn.textContent = 'Save current';
+      saveBtn.title = 'Overwrite this keyframe with the current pose';
+      saveBtn.disabled = playing;
+      saveBtn.addEventListener('click', () => keyframes.saveTo(idx));
+      const gotoBtn = document.createElement('button');
+      gotoBtn.type = 'button';
+      gotoBtn.className = 'secondary px-2 py-0.5 text-xs';
+      gotoBtn.textContent = 'Go to';
+      gotoBtn.title = 'Snap the robot to this pose';
+      gotoBtn.disabled = playing;
+      gotoBtn.addEventListener('click', () => keyframes.goto(idx));
+      const delBtn = document.createElement('button');
+      delBtn.type = 'button';
+      delBtn.className = 'secondary px-2 py-0.5 text-xs';
+      delBtn.textContent = 'Delete';
+      delBtn.disabled = playing;
+      delBtn.addEventListener('click', () => keyframes.delete(idx));
+      btnGroup.appendChild(saveBtn);
+      btnGroup.appendChild(gotoBtn);
+      btnGroup.appendChild(delBtn);
+      head.appendChild(btnGroup);
+      card.appendChild(head);
+
+      const angleList = document.createElement('div');
+      angleList.className = 'text-slate-400 tabular-nums';
+      angleList.textContent = frame.angles
+        .map((deg, j) => `\u03b8${j + 1}=${(deg ?? 0).toFixed(1)}\u00b0`)
+        .join('  ');
+      card.appendChild(angleList);
+
+      wrap.appendChild(card);
+    });
+  }
+
+  function syncSequenceUi() {
+    if (!sequenceRefs) return;
+    const r = sequenceRefs;
+    const playing = keyframes.playing;
+    const enoughFrames = keyframes.frames.length >= 2;
+
+    r.addBtn.disabled = playing;
+    r.playBtn.disabled = playing || !enoughFrames;
+    r.cancelBtn.disabled = !playing;
+    r.clearBtn.disabled = playing || keyframes.frames.length === 0;
+    r.durationInput.disabled = playing;
+    r.easingSelect.disabled = playing;
+
+    if (document.activeElement !== r.durationInput) {
+      const displayed = Number.parseFloat(r.durationInput.value);
+      if (displayed !== planner.durationSeconds) {
+        r.durationInput.value = planner.durationSeconds.toFixed(1);
+      }
+    }
+    if (r.easingSelect.value !== planner.easing) r.easingSelect.value = planner.easing;
+
+    if (playing) r.statusText.textContent = `Playing \u2026 ${keyframes.frames.length} keyframes`;
+    else if (!enoughFrames) r.statusText.textContent = 'Add at least two keyframes to play.';
+    else r.statusText.textContent = `${keyframes.frames.length} keyframes ready.`;
+
+    rebuildKeyframeList();
+  }
+
   function syncManualInputsFromState() {
     for (let i = 0; i < state.numLinks; i++) {
       const v = state.links[i].angleDeg;
@@ -328,12 +529,19 @@ export function mountControlsPanel(container, state, planner) {
 
   state.subscribe('angles', () => {
     if (mode === 'manual') syncManualInputsFromState();
-    else syncPlannerCurrentFromState();
+    else if (mode === 'planner') syncPlannerCurrentFromState();
   });
 
   planner.subscribe(() => {
     if (mode === 'planner') syncPlannerUi();
+    else if (mode === 'sequence') syncSequenceUi();
   });
+
+  if (keyframes) {
+    keyframes.subscribe(() => {
+      if (mode === 'sequence') syncSequenceUi();
+    });
+  }
 
   render();
 }
