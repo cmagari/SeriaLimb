@@ -9,15 +9,21 @@
   <body class="bg-slate-950 text-slate-100 font-sans">
     <div id="app" class="h-screen w-screen flex">
       <section id="viewport" class="flex-[7] relative"></section>
-      <aside id="sidebar" class="flex-[3] min-w-[380px] border-l border-slate-700 flex flex-col bg-slate-900">
-        <header class="px-4 py-3 border-b border-slate-700">
-          <h1 class="text-lg font-semibold tracking-tight">SeriaLimb</h1>
-          <p class="text-xs text-slate-400">3D serial-link robot visualizer</p>
-        </header>
-        <div id="tab-bar" class="flex border-b border-slate-700" role="tablist"></div>
-        <div id="panel-setup" class="tab-panel flex-1 overflow-y-auto p-4"></div>
-        <div id="panel-controls" class="tab-panel flex-1 overflow-y-auto p-4 hidden"></div>
-        <div id="panel-view" class="tab-panel flex-1 overflow-y-auto p-4 hidden"></div>
+      <aside id="sidebar" class="flex-[3] min-w-[380px] border-l border-slate-700 flex flex-row bg-slate-900">
+        <button id="sidebar-toggle" class="sidebar-toggle" title="Collapse panel" aria-label="Toggle panel">
+          <span class="sidebar-toggle-icon">›</span>
+        </button>
+        <div id="sidebar-content" class="flex flex-col flex-1 min-w-0">
+          <header class="px-4 py-3 border-b border-slate-700 flex-shrink-0">
+            <h1 class="text-lg font-semibold tracking-tight">SeriaLimb</h1>
+            <p class="text-xs text-slate-400">3D serial-link robot visualizer</p>
+          </header>
+          <div id="tab-bar" class="flex border-b border-slate-700 flex-shrink-0" role="tablist"></div>
+          <div id="panel-setup" class="tab-panel flex-1 overflow-y-auto p-4"></div>
+          <div id="panel-controls" class="tab-panel flex-1 overflow-y-auto p-4 hidden"></div>
+          <div id="panel-view" class="tab-panel flex-1 overflow-y-auto p-4 hidden"></div>
+          <div id="panel-telemetry" class="tab-panel flex-1 overflow-y-auto p-4 hidden"></div>
+        </div>
       </aside>
     </div>
     <script type="module" src="/src/main.js"></script>

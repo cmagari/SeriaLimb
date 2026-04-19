@@ -2,6 +2,7 @@ const TABS = [
   { id: 'setup', label: 'Setup' },
   { id: 'controls', label: 'Controls' },
   { id: 'view', label: 'View' },
+  { id: 'telemetry', label: 'Telemetry' },
 ];
 
 export function mountTabs(tabBarEl, onSwitch) {

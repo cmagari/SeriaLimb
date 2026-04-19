@@ -1,6 +1,8 @@
 # SeriaLimb
 
-A browser-based 3D visualizer for **N-link revolute serial robots**. Define the chain, drive each joint angle with a slider, and watch the arm update live in a Three.js viewport.
+![SeriaLimb](./seriaLimb.jpg)
+
+A browser-based 3D visualizer for **N-link revolute serial robots**. Define the chain, drive each joint angle with a slider, run animated motions, and inspect per-joint telemetry.
 
 ---
 
@@ -20,8 +22,6 @@ npm run dev
 
 Vite will print a local URL (e.g. `http://localhost:5173/`). Open it in your browser.
 
-Other scripts:
-
 | Command | What it does |
 | --- | --- |
 | `npm run dev` | Start the dev server with hot reload. |
@@ -32,77 +32,155 @@ Other scripts:
 
 ## Using the app
 
-The window is split 70 / 30: the **3D viewport** on the left and the **sidebar** (Setup + Controls tabs) on the right.
+The window is split 70 / 30: the **3D viewport** on the left and the **sidebar** (Setup / Controls / View / Telemetry tabs) on the right. The sidebar can be collapsed with the thin strip on its left edge.
 
 ### Viewport
 
 - **Left-click + drag** — orbit the camera.
 - **Right-click + drag** — pan.
 - **Scroll wheel** — zoom.
-- The grid is on the XZ plane (Y up); axes helper shows X (red), Y (green), Z (blue) at the base.
-- Color key: **slate** cylinder = base, **orange** cylinders = joints (length-axis = each joint's rotation axis), **blue** cylinders = links, **green** sphere = end-effector payload.
+- The grid is on the XZ plane (Y up); the axes helper at the base shows X (red), Y (green), Z (blue).
+- Color key: **slate** disc = base, **amber** cylinders = joints (cylinder axis = rotation axis), **blue** cylinders = links, **green** sphere = end-effector / payload.
+- Joint and link cylinder radii scale with `√mass` so heavier elements are visually larger.
 
 ### Setup tab
 
-Defines the robot's structure. Edits here stage locally — nothing changes in the scene until you click **Build / Refresh**.
+Defines the robot's structure. Edits stage locally — nothing changes in the 3D scene until you click **Build / Refresh**.
 
 | Field | Meaning |
 | --- | --- |
-| `N (links)` | Number of links in the chain (1–12). |
-| `Length (m)` | Link length in meters, measured along its local +X axis. |
-| `Link mass (kg)` | Point mass at the **center of the link**; controls link cylinder radius (`r ∝ √mass`). |
-| `Joint mass (kg)` | Actuator mass at the **center of the joint**; controls joint cylinder radius. |
+| `N (links)` | Number of revolute joints / links in the chain (1–12). |
+| `Length (m)` | Link length measured along its local +X axis. |
+| `Link mass (kg)` | Point mass at the **center of the link** (link midpoint). |
+| `Joint mass (kg)` | Actuator mass at the **joint pivot**. |
 | `Axis` | Rotation axis for this joint: `X`, `Y`, or `Z` (default `Z`). |
-| `Payload mass (kg)` | Mass at the end-effector; controls the green tip sphere radius. |
+| `Payload mass (kg)` | Point mass at the end-effector tip. |
 
-Click **Build / Refresh** to apply. Joint angles are preserved across rebuilds when the link index still exists.
-
-> **Mass convention.** Link and joint masses are treated as point masses placed at the geometric center of their respective element (link midpoint, joint pivot). The payload mass is a point mass at the tip of the last link. This is the convention future CoM / dynamics work will assume.
+Joint angles are preserved across rebuilds when the link index still exists.
 
 ### Controls tab
 
-Has two modes, toggled at the top: **Manual** and **Planner**. **Reset to 0** is available in either mode (cancels a running motion and zeroes all joint angles).
+Two modes toggled at the top. **Reset to 0** is available in either mode and cancels any running motion.
 
 #### Manual mode
 
-One row per joint, generated from the current structure:
-
-- **Slider** — drag from −180° to +180°.
-- **Number input** — type a precise value; slider follows.
-- **Readout** — shows the current angle in degrees, updated live.
-
-Changes apply immediately to the 3D model.
+One row per joint with a slider (−180° to +180°) and a number input. Changes apply to the 3D model immediately.
 
 #### Planner mode
 
-Animates the robot from its current pose to a set of target joint angles over a fixed duration.
+Animates the robot from its current pose to a set of target joint angles.
 
 | Control | Purpose |
 | --- | --- |
-| `Duration (s)` | How long the motion should take (0–120 s). `0` snaps instantly. |
-| `Easing` | `Smooth` (cubic ease-in-out, default) or `Linear`. |
-| Per-joint target slider + number | The angle you want θᵢ to reach. The *now* readout on the right shows the live current angle. |
-| `Snap to current` | Copies the robot's current pose into the targets (handy starting point). |
-| `Zero targets` | Sets every target back to 0°. |
-| `Run` | Kicks off the motion. All joints start together and arrive together. |
-| `Cancel` | Stops a running motion immediately (robot freezes at its current pose). |
-| Progress bar | Fills left-to-right while the motion runs; shows the outcome when it stops. |
+| `Duration (s)` | Motion duration, 0–120 s. `0` snaps instantly. |
+| `Easing` | `Smooth` (cubic ease-in-out) or `Linear`. |
+| Per-joint target | The angle θᵢ to reach. The *now* readout shows the live current angle. |
+| `Snap to current` | Copies the current pose into the targets. |
+| `Zero targets` | Sets every target to 0°. |
+| `Run` | Starts the motion; all joints depart and arrive together. |
+| `Cancel` | Freezes the robot at its current pose. |
 
-Inputs are disabled while a motion is running; switching back to Manual mode also cancels any active motion.
+Inputs are disabled while a motion is running. Switching to Manual mode also cancels any active motion.
 
----
+Each completed (or cancelled) planner session is automatically recorded and available in the **Telemetry tab**.
 
 ### View tab
 
-Toggle CoM (center-of-mass) visualizations. Markers are always positioned in world space and update in real time as joints are driven.
+Toggle center-of-mass visualizations. Markers update in real time and render on top of geometry (depth-test disabled).
 
 | Toggle | Visual | What it shows |
 | --- | --- | --- |
 | **Joint CoM markers** | Amber crosshairs | Point mass at each joint pivot |
-| **Link & payload CoM markers** | Sky-blue crosshairs (links) + lime crosshair (payload) | Point mass at each link midpoint; separate style at the end-effector |
-| **Assembly CoM** | White sphere + violet rings | Weighted center of mass of the entire robot: all joint masses + link masses + payload |
+| **Link & payload CoM markers** | Sky-blue (links) + lime (payload) crosshairs | Point mass at each link midpoint and at the end-effector |
+| **Assembly CoM** | White sphere + violet rings | Weighted CoM of the full robot (all joints + links + payload) |
 
-The crosshair geometry (three perpendicular line segments) is the standard mechanics notation for a point mass. The assembly marker uses a sphere-plus-rings to distinguish it clearly from the individual markers.
+### Telemetry tab
+
+Shows per-joint time-series plots recorded from the most recent planner session(s). Up to 5 sessions are retained.
+
+**Session selector** — shown when more than one session exists. Pick any session from the dropdown.
+
+**Clear** — removes all stored sessions.
+
+**Export CSV** — downloads a `.csv` with one row per recorded sample:
+
+```
+time_s, θ1_deg … θN_deg, ω1_degs … ωN_degs, τ1_Nm … τN_Nm, P1_W … PN_W
+```
+
+**Export PNG** — downloads a single composite image of all four charts.
+
+---
+
+## Telemetry calculations
+
+Telemetry is sampled once per `requestAnimationFrame` tick (typically ~60 Hz) for the duration of a planner motion. Four quantities are computed for each joint at each sample.
+
+### Joint angle θᵢ (°)
+
+Taken directly from the robot state after the planner interpolates the pose for that frame. No transformation needed.
+
+### Angular velocity ωᵢ (°/s)
+
+Finite difference between consecutive samples:
+
+```
+ωᵢ[k] = (θᵢ[k] − θᵢ[k−1]) / Δt
+```
+
+where `Δt` is the wall-clock time between frames in seconds. The first and last samples are defined as zero (motion has not started / has just completed).
+
+### Gravity torque τᵢ (N·m)
+
+A **quasi-static** model: the torque joint `i` must exert to hold all distal masses stationary against gravity. Dynamic effects (inertia, Coriolis, damping) are not included.
+
+**Assumptions**
+
+- Gravity acts in the −Y world direction, magnitude g = 9.81 m/s².
+- Each link is a point mass at its midpoint (halfway between its two joint pivots in world space).
+- Each joint is a point mass at its pivot.
+- The payload is a point mass at the end-effector tip.
+
+**Moment arm per joint axis**
+
+For a mass at world position **p** relative to joint `i`'s pivot **pᵢ**, let **r** = **p** − **pᵢ**. The torque contribution about joint `i`'s rotation axis due to a vertical force is:
+
+```
+τ_contrib = mass × g × moment_arm
+```
+
+The moment arm (derived from the cross-product `r × ĝ` projected onto the joint axis, where ĝ = (0,−1,0)) depends only on the joint's rotation axis:
+
+| Joint axis | Moment arm |
+| --- | --- |
+| X | `|r.z|` |
+| Y | `0` (vertical axis — no gravity coupling) |
+| Z | `|r.x|` |
+
+**Summation**
+
+For joint `i` (0-indexed), masses distal to it are:
+
+- **Link j CoM**, for j = i … N−1: mass = `links[j].linkMass`, position = midpoint of `jointPositions[j]` and `jointPositions[j+1]`
+- **Joint j+1 mass**, for j = i … N−2: mass = `links[j+1].jointMass`, position = `jointPositions[j+1]`
+- **Payload**: mass = `payloadMass`, position = `jointPositions[N]` (end-effector tip)
+
+Joint `i`'s own mass sits at the pivot (zero moment arm) and contributes nothing.
+
+World positions are computed via forward kinematics (`accumulate` in `src/kinematics/forwardKinematics.js`) at the current joint angles for each sample.
+
+### Joint power Pᵢ (W)
+
+```
+Pᵢ = τᵢ × ωᵢ_rad
+```
+
+where `ωᵢ_rad = ωᵢ × π/180` (angular velocity in rad/s).
+
+Sign convention:
+
+- **Positive** — joint is moving against gravity (motor is driving the load).
+- **Negative** — gravity is assisting the motion (motor is braking or coasting).
 
 ---
 
@@ -111,10 +189,10 @@ The crosshair geometry (three perpendicular line segments) is the standard mecha
 Each joint `i` applies the transform
 
 ```
-T_i = R_axis_i(θ_i) · Tx(L_i)
+Tᵢ = R_axis_i(θᵢ) · Tx(Lᵢ)
 ```
 
-where `R_axis` is a rotation about the selected local axis and `Tx(L)` is a translation of the link length along the local +X axis. The world-frame transform for joint `n` is `T_1 · T_2 · … · T_n`. The scene graph nests these as Three.js `Group`s so rotations propagate to downstream links automatically.
+where `R_axis` rotates about the selected local axis and `Tx(L)` translates along local +X. The world-frame transform for the tip is `T₁ · T₂ · … · Tₙ`. The Three.js scene graph nests these as `Group` objects so rotations propagate to downstream links automatically.
 
 ---
 
@@ -124,23 +202,27 @@ where `R_axis` is a rotation about the selected local axis and `Tx(L)` is a tran
 SeriaLimb/
 ├── index.html
 ├── package.json
-├── vite.config.js
 └── src/
-    ├── main.js                 # entry: wires state, scene, UI
-    ├── style.css               # Tailwind v4 + component styles
+    ├── main.js                    # entry: wires state, scene, UI
+    ├── style.css                  # Tailwind v4 + component styles
     ├── model/
-    │   └── robotState.js       # state store with pub/sub
+    │   └── robotState.js          # state store (pub/sub: 'structure', 'angles')
     ├── kinematics/
-    │   └── forwardKinematics.js
+    │   └── forwardKinematics.js   # segmentTransform + accumulate → joint world positions
     ├── motion/
-    │   └── motionPlanner.js    # target angles, easing, rAF animation loop
+    │   ├── motionPlanner.js       # target angles, easing, rAF animation loop
+    │   └── telemetryRecorder.js   # per-frame angle/velocity/torque/power recorder
     ├── scene/
-    │   ├── sceneManager.js     # renderer, camera, lights, orbit
-    │   └── robotMesh.js        # hierarchical robot tree
+    │   ├── sceneManager.js        # renderer, camera, lights, orbit controls
+    │   ├── robotMesh.js           # hierarchical robot Three.js tree
+    │   ├── comMarkers.js          # CoM crosshairs and assembly sphere
+    │   └── viewState.js           # CoM visibility flags
     └── ui/
         ├── tabs.js
         ├── setupPanel.js
-        └── controlsPanel.js    # manual + planner modes
+        ├── controlsPanel.js       # manual + planner modes
+        ├── viewPanel.js           # CoM toggles
+        └── telemetryPanel.js      # Chart.js plots + CSV/PNG export
 ```
 
 ## Tech stack
@@ -148,12 +230,12 @@ SeriaLimb/
 - **Vite 5** — dev server and bundler.
 - **Three.js** — scene graph, `Matrix4`, `OrbitControls`.
 - **Tailwind CSS v4** — styling via the `@tailwindcss/vite` plugin.
+- **Chart.js** — time-series line charts in the Telemetry tab.
 
 ---
 
 ## Roadmap
 
-- JSON / URDF export of the current configuration.
-- Inverse Kinematics — drag the end-effector to solve joint angles.
-- Center-of-Mass visualization (masses are already captured in state).
-- Simple gravity simulation for unpowered joints.
+- JSON / URDF export of the current robot configuration.
+- Inverse kinematics — drag the end-effector to solve joint angles.
+- Full rigid-body dynamics (inertia tensors, Coriolis, damping) to extend the quasi-static torque model.
