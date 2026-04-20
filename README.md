@@ -1,6 +1,6 @@
 # SeriaLimb
 
-![SeriaLimb](./seriaLimb.jpg)
+![SeriaLimb](./media/serialimb.jpg)
 
 A browser-based 3D visualizer for **N-link revolute serial robots**. Define the chain, drive each joint angle with a slider, run animated motions, and inspect per-joint telemetry.
 

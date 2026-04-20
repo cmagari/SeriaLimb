@@ -1,4 +1,5 @@
 import {
+  Color,
   Group,
   Mesh,
   MeshStandardMaterial,
@@ -6,12 +7,13 @@ import {
   CylinderGeometry,
   MathUtils,
 } from 'three';
+import { jointColor } from './jointColors.js';
 
 const COLORS = {
-  link: 0x3b82f6,
+  link: 0xcbd5e1,
   joint: 0xf59e0b,
   base: 0x64748b,
-  endEffector: 0x22c55e,
+  endEffector: 0x1f2937,
 };
 
 const BASE_JOINT_RADIUS = 0.12;
@@ -59,6 +61,7 @@ export function buildRobotTree(state) {
   const root = new Group();
   root.name = 'robotRoot';
   const jointGroups = [];
+  const jointMeshes = [];
 
   const baseMarker = new Mesh(
     new CylinderGeometry(0.22, 0.28, 0.08, 32),
@@ -82,6 +85,7 @@ export function buildRobotTree(state) {
     const jointMesh = makeJointCylinder(link.axis, link.jointMass);
     jointMesh.userData.dragHandle = { type: 'joint', index: i };
     jointGroup.add(jointMesh);
+    jointMeshes.push(jointMesh);
 
     const r = linkRadius(link.linkMass);
     const linkMesh = new Mesh(
@@ -107,7 +111,18 @@ export function buildRobotTree(state) {
   }
 
   root.userData.jointGroups = jointGroups;
+  root.userData.jointMeshes = jointMeshes;
   return root;
+}
+
+export function applyJointColors(root, useColors) {
+  const meshes = root.userData.jointMeshes;
+  if (!meshes) return;
+  const defaultColor = new Color(COLORS.joint);
+  for (let i = 0; i < meshes.length; i++) {
+    const color = useColors ? new Color(jointColor(i)) : defaultColor;
+    meshes[i].material.color.copy(color);
+  }
 }
 
 export function applyAngles(root, state) {

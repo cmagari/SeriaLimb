@@ -1,6 +1,6 @@
 import { createRobotState } from './model/robotState.js';
 import { createSceneManager } from './scene/sceneManager.js';
-import { buildRobotTree, applyAngles, disposeRobotTree } from './scene/robotMesh.js';
+import { buildRobotTree, applyAngles, applyJointColors, disposeRobotTree } from './scene/robotMesh.js';
 import { buildCoMMarkers, updateCoMMarkers, applyCoMVisibility, disposeCoMMarkers } from './scene/comMarkers.js';
 import { createViewState } from './scene/viewState.js';
 import { createMotionPlanner } from './motion/motionPlanner.js';
@@ -32,12 +32,14 @@ sceneMgr.scene.add(robotRoot);
 let comRoot = buildCoMMarkers(state, robotRoot);
 sceneMgr.scene.add(comRoot);
 applyCoMVisibility(comRoot, viewState);
+applyJointColors(robotRoot, viewState.showJointColors);
 
 state.subscribe('structure', () => {
   sceneMgr.scene.remove(robotRoot);
   disposeRobotTree(robotRoot);
   robotRoot = buildRobotTree(state);
   sceneMgr.scene.add(robotRoot);
+  applyJointColors(robotRoot, viewState.showJointColors);
 
   sceneMgr.scene.remove(comRoot);
   disposeCoMMarkers(comRoot);
@@ -53,6 +55,7 @@ state.subscribe('angles', () => {
 
 viewState.subscribe(() => {
   applyCoMVisibility(comRoot, viewState);
+  applyJointColors(robotRoot, viewState.showJointColors);
 });
 
 createDragControls({

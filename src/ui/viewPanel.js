@@ -1,3 +1,5 @@
+import { JOINT_COLORS } from '../scene/jointColors.js';
+
 const TOGGLES = [
   {
     key: 'showJointCoM',
@@ -22,6 +24,12 @@ const TOGGLES = [
       { color: '#fafafa', tip: 'sphere' },
       { color: '#a78bfa', tip: 'rings' },
     ],
+  },
+  {
+    key: 'showJointColors',
+    label: 'Highlight joints by color',
+    desc: 'Color each joint to match its series in the telemetry graphs',
+    swatches: JOINT_COLORS.slice(0, 4).map((c, i) => ({ color: c, tip: `J${i + 1}` })),
   },
 ];
 

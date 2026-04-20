@@ -3,6 +3,7 @@ export function createViewState() {
     showJointCoM: false,
     showLinkCoM: false,
     showAssemblyCoM: false,
+    showJointColors: false,
   };
   const listeners = new Set();
 
@@ -14,6 +15,7 @@ export function createViewState() {
     get showJointCoM() { return flags.showJointCoM; },
     get showLinkCoM() { return flags.showLinkCoM; },
     get showAssemblyCoM() { return flags.showAssemblyCoM; },
+    get showJointColors() { return flags.showJointColors; },
 
     toggle(key) {
       if (!(key in flags)) return;
