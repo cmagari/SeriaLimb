@@ -1,6 +1,8 @@
 export const MIN_LINKS = 1;
 export const MAX_LINKS = 12;
 export const DEFAULT_PAYLOAD_MASS = 1.0;
+export const ANGLE_MIN = -180;
+export const ANGLE_MAX = 180;
 
 const DEFAULT_LINK = Object.freeze({
   length: 1.0,
@@ -8,6 +10,8 @@ const DEFAULT_LINK = Object.freeze({
   jointMass: 1.0,
   axis: 'z',
   angleDeg: 0,
+  minAngleDeg: ANGLE_MIN,
+  maxAngleDeg: ANGLE_MAX,
 });
 
 export function createRobotState(initial = {}) {
@@ -49,13 +53,17 @@ export function createRobotState(initial = {}) {
       const newLinks = [];
       for (let i = 0; i < n; i++) {
         const src = spec.links?.[i] ?? {};
+        const { min, max } = normalizeLimits(src.minAngleDeg, src.maxAngleDeg);
         const prevAngle = links[i]?.angleDeg ?? 0;
+        const rawAngle = src.angleDeg !== undefined ? src.angleDeg : prevAngle;
         newLinks.push({
           length: clampPositive(src.length, DEFAULT_LINK.length),
           linkMass: clampPositive(src.linkMass, DEFAULT_LINK.linkMass),
           jointMass: clampPositive(src.jointMass, DEFAULT_LINK.jointMass),
           axis: isAxis(src.axis) ? src.axis : DEFAULT_LINK.axis,
-          angleDeg: prevAngle,
+          minAngleDeg: min,
+          maxAngleDeg: max,
+          angleDeg: clampBetween(rawAngle, min, max),
         });
       }
       links.length = 0;
@@ -68,9 +76,10 @@ export function createRobotState(initial = {}) {
 
     setAngle(index, deg) {
       if (index < 0 || index >= links.length) return;
-      const clamped = clampAngle(deg);
-      if (links[index].angleDeg === clamped) return;
-      links[index].angleDeg = clamped;
+      const link = links[index];
+      const clamped = clampBetween(deg, link.minAngleDeg, link.maxAngleDeg);
+      if (link.angleDeg === clamped) return;
+      link.angleDeg = clamped;
       emit('angles');
     },
 
@@ -79,9 +88,10 @@ export function createRobotState(initial = {}) {
       let changed = false;
       const n = Math.min(degsArray.length, links.length);
       for (let i = 0; i < n; i++) {
-        const clamped = clampAngle(degsArray[i]);
-        if (links[i].angleDeg !== clamped) {
-          links[i].angleDeg = clamped;
+        const link = links[i];
+        const clamped = clampBetween(degsArray[i], link.minAngleDeg, link.maxAngleDeg);
+        if (link.angleDeg !== clamped) {
+          link.angleDeg = clamped;
           changed = true;
         }
       }
@@ -91,8 +101,9 @@ export function createRobotState(initial = {}) {
     resetAngles() {
       let changed = false;
       for (const l of links) {
-        if (l.angleDeg !== 0) {
-          l.angleDeg = 0;
+        const target = clampBetween(0, l.minAngleDeg, l.maxAngleDeg);
+        if (l.angleDeg !== target) {
+          l.angleDeg = target;
           changed = true;
         }
       }
@@ -108,15 +119,25 @@ function normalizeLinks(numLinks, sources) {
   const out = [];
   for (let i = 0; i < n; i++) {
     const src = sources[i] ?? {};
+    const { min, max } = normalizeLimits(src.minAngleDeg, src.maxAngleDeg);
     out.push({
       length: clampPositive(src.length, DEFAULT_LINK.length),
       linkMass: clampPositive(src.linkMass, DEFAULT_LINK.linkMass),
       jointMass: clampPositive(src.jointMass, DEFAULT_LINK.jointMass),
       axis: isAxis(src.axis) ? src.axis : DEFAULT_LINK.axis,
-      angleDeg: clampAngle(src.angleDeg ?? 0),
+      minAngleDeg: min,
+      maxAngleDeg: max,
+      angleDeg: clampBetween(src.angleDeg ?? 0, min, max),
     });
   }
   return out;
+}
+
+function normalizeLimits(minRaw, maxRaw) {
+  let min = clampLimit(minRaw, ANGLE_MIN);
+  let max = clampLimit(maxRaw, ANGLE_MAX);
+  if (min > max) [min, max] = [max, min];
+  return { min, max };
 }
 
 function clampInt(v, min, max) {
@@ -137,10 +158,16 @@ function clampNonNegative(v, fallback) {
   return Math.min(1000, n);
 }
 
-function clampAngle(v) {
+function clampLimit(v, fallback) {
   const n = typeof v === 'number' ? v : Number.parseFloat(v);
-  if (!Number.isFinite(n)) return 0;
-  return Math.max(-180, Math.min(180, n));
+  if (!Number.isFinite(n)) return fallback;
+  return Math.max(ANGLE_MIN, Math.min(ANGLE_MAX, n));
+}
+
+function clampBetween(v, min, max) {
+  const n = typeof v === 'number' ? v : Number.parseFloat(v);
+  if (!Number.isFinite(n)) return Math.max(min, Math.min(max, 0));
+  return Math.max(min, Math.min(max, n));
 }
 
 function isAxis(a) {

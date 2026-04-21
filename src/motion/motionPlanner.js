@@ -31,9 +31,19 @@ export function createMotionPlanner(state) {
     const n = state.numLinks;
     const next = new Array(n);
     for (let i = 0; i < n; i++) {
-      next[i] = i < targets.length ? targets[i] : 0;
+      const raw = i < targets.length ? targets[i] : 0;
+      next[i] = clampTargetForJoint(i, raw);
     }
     targets = next;
+  }
+
+  function clampTargetForJoint(i, v) {
+    const link = state.links[i];
+    const minA = link?.minAngleDeg ?? -180;
+    const maxA = link?.maxAngleDeg ?? 180;
+    const n = typeof v === 'number' ? v : Number.parseFloat(v);
+    if (!Number.isFinite(n)) return Math.max(minA, Math.min(maxA, 0));
+    return Math.max(minA, Math.min(maxA, n));
   }
 
   state.subscribe('structure', () => {
@@ -115,7 +125,7 @@ export function createMotionPlanner(state) {
 
     setTarget(i, deg) {
       if (i < 0 || i >= targets.length) return;
-      const v = clampAngle(deg);
+      const v = clampTargetForJoint(i, deg);
       if (targets[i] === v) return;
       targets[i] = v;
       emit();
@@ -136,8 +146,9 @@ export function createMotionPlanner(state) {
     zeroTargets() {
       let changed = false;
       for (let i = 0; i < targets.length; i++) {
-        if (targets[i] !== 0) {
-          targets[i] = 0;
+        const zero = clampTargetForJoint(i, 0);
+        if (targets[i] !== zero) {
+          targets[i] = zero;
           changed = true;
         }
       }
@@ -175,10 +186,4 @@ function zeros(n) {
   const a = new Array(n);
   for (let i = 0; i < n; i++) a[i] = 0;
   return a;
-}
-
-function clampAngle(v) {
-  const n = typeof v === 'number' ? v : Number.parseFloat(v);
-  if (!Number.isFinite(n)) return 0;
-  return Math.max(-180, Math.min(180, n));
 }

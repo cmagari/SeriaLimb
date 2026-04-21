@@ -56,9 +56,23 @@ Defines the robot's structure. Edits stage locally — nothing changes in the 3D
 | `Link mass (kg)` | Point mass at the **center of the link** (link midpoint). |
 | `Joint mass (kg)` | Actuator mass at the **joint pivot**. |
 | `Axis` | Rotation axis for this joint: `X`, `Y`, or `Z` (default `Z`). |
+| `Min θ` / `Max θ` | Per-joint angle limits in degrees (range −180°…180°; defaults ±180°). Sliders, IK, drag, and planner all clamp to these. |
 | `Payload mass (kg)` | Point mass at the end-effector tip. |
 
-Joint angles are preserved across rebuilds when the link index still exists.
+Joint angles are preserved across rebuilds when the link index still exists and remain inside the (possibly tightened) limits.
+
+**Export CSV / Load CSV** — save or restore the full configuration (links, limits, current pose, payload) as a CSV file. The format is a commented header followed by one row per link:
+
+```
+# SeriaLimb configuration
+# payloadMass=1.0
+index,length_m,linkMass_kg,jointMass_kg,axis,minAngleDeg,maxAngleDeg,angleDeg
+1,1.0,1.0,1.0,z,-180,180,0
+2,0.8,0.8,0.9,y,-90,90,15
+3,0.6,0.5,0.7,z,-120,120,-30
+```
+
+Loading a CSV applies immediately (it does not stage).
 
 ### Controls tab
 
@@ -228,7 +242,8 @@ SeriaLimb/
     ├── main.js                    # entry: wires state, scene, UI, drag controls, keyframe store
     ├── style.css                  # Tailwind v4 + component styles
     ├── model/
-    │   └── robotState.js          # state store (pub/sub: 'structure', 'angles')
+    │   ├── robotState.js          # state store (pub/sub: 'structure', 'angles'); per-link angle limits
+    │   └── configCsv.js           # serialize / parse the full robot config as CSV
     ├── kinematics/
     │   ├── forwardKinematics.js   # segmentTransform + accumulate → joint world positions
     │   └── inverseKinematics.js   # CCD solver for arbitrary per-joint axes
@@ -263,5 +278,4 @@ SeriaLimb/
 
 - JSON / URDF export of the current robot configuration.
 - Save / load keyframe sequences across sessions.
-- Joint angle limits per link (hard stops in IK and slider clamps).
 - Full rigid-body dynamics (inertia tensors, Coriolis, damping) to extend the quasi-static torque model.

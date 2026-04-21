@@ -85,8 +85,8 @@ export function mountControlsPanel(container, state, planner, keyframes) {
 
       const ctrlRow = document.createElement('div');
       ctrlRow.className = 'flex items-center gap-2';
-      const slider = makeAngleSlider(link.angleDeg);
-      const number = makeAngleNumber(link.angleDeg);
+      const slider = makeAngleSlider(link.angleDeg, link.minAngleDeg, link.maxAngleDeg);
+      const number = makeAngleNumber(link.angleDeg, link.minAngleDeg, link.maxAngleDeg);
       const unit = makeUnit();
       ctrlRow.appendChild(slider);
       ctrlRow.appendChild(number);
@@ -180,8 +180,8 @@ export function mountControlsPanel(container, state, planner, keyframes) {
 
       const ctrlRow = document.createElement('div');
       ctrlRow.className = 'flex items-center gap-2';
-      const slider = makeAngleSlider(target);
-      const number = makeAngleNumber(target);
+      const slider = makeAngleSlider(target, link.minAngleDeg, link.maxAngleDeg);
+      const number = makeAngleNumber(target, link.minAngleDeg, link.maxAngleDeg);
       const unit = makeUnit();
       ctrlRow.appendChild(slider);
       ctrlRow.appendChild(number);
@@ -546,22 +546,22 @@ export function mountControlsPanel(container, state, planner, keyframes) {
   render();
 }
 
-function makeAngleSlider(value) {
+function makeAngleSlider(value, min = -180, max = 180) {
   const el = document.createElement('input');
   el.type = 'range';
-  el.min = '-180';
-  el.max = '180';
+  el.min = String(min);
+  el.max = String(max);
   el.step = '0.1';
   el.value = String(value);
   el.className = 'flex-1';
   return el;
 }
 
-function makeAngleNumber(value) {
+function makeAngleNumber(value, min = -180, max = 180) {
   const el = document.createElement('input');
   el.type = 'number';
-  el.min = '-180';
-  el.max = '180';
+  el.min = String(min);
+  el.max = String(max);
   el.step = '0.1';
   el.value = value.toFixed(1);
   el.className = 'w-20';

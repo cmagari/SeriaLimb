@@ -51,7 +51,9 @@ export function solveCCD(links, currentAngles, targetWorld) {
 
       const cross = new Vector3().crossVectors(aP, bP);
       const deltaDeg = Math.atan2(cross.dot(axisW), aP.dot(bP)) * RAD2DEG;
-      angles[i] = Math.max(-180, Math.min(180, angles[i] + deltaDeg));
+      const minA = links[i].minAngleDeg ?? -180;
+      const maxA = links[i].maxAngleDeg ?? 180;
+      angles[i] = Math.max(minA, Math.min(maxA, angles[i] + deltaDeg));
 
       ({ positions } = fk(links, angles));
     }

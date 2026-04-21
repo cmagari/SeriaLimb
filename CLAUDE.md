@@ -12,7 +12,8 @@ SeriaLimb — browser-based 3D serial-link robot visualizer.
 ```
 src/
   model/
-    robotState.js          # pub/sub state (events: 'structure', 'angles'); N links, per-link mass/axis/angle, payloadMass
+    robotState.js          # pub/sub state (events: 'structure', 'angles'); N links, per-link mass/axis/angle/min+max limits, payloadMass
+    configCsv.js           # exportConfigCsv / parseConfigCsv — round-trip the full config (links + limits + pose + payload)
   kinematics/
     forwardKinematics.js   # segmentTransform (Matrix4 rot+trans) + accumulate → joint world positions
     inverseKinematics.js   # solveCCD — cyclic coordinate descent IK for arbitrary per-joint axes
@@ -43,4 +44,5 @@ src/
 - Telemetry sessions: a normal `planner.start()` produces one session; wrapping a group of starts in `recorder.beginGroup()` / `endGroup()` merges them into a single continuous session (used by `keyframes.play`)
 - Keyframes persist across structure changes — `play()` pads/truncates to current `numLinks`; user clears explicitly via the panel
 - Sidebar collapse: CSS `max-width` transition on `#sidebar-content`; inline style overrides for Tailwind flex
-- Angles clamped to ±180°; link count 1–12; masses must be positive
+- Angles clamped to per-joint `[minAngleDeg, maxAngleDeg]` (each ∈ [-180°, 180°], defaults ±180°). `robotState.setAngle`/`setAngles`, `solveCCD`, and `planner.setTarget` all enforce this; UI sliders derive their `min`/`max` from the joint's limits.
+- Link count 1–12; masses must be positive
